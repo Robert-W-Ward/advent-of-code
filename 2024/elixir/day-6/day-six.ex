@@ -15,7 +15,7 @@ defmodule Board do
     {new_position, new_direction, updated_visited} =
       step(current_position, current_direction, visited, positions)
 
-    if new_position == current_position and MapSet.size(updated_visited) > 1 do
+    if new_position == {90, 53} and MapSet.size(updated_visited) > 1 do
       IO.puts("Finished! Total spaces visited: #{MapSet.size(updated_visited)}")
     else
       iterate(new_position, new_direction, updated_visited, positions)
@@ -28,19 +28,29 @@ defmodule Board do
 
     new_position =
       case current_direction do
-        :north -> {x, y + 1}
-        :east -> {x + 1, y}
-        :south -> {x, y - 1}
-        :west -> {x - 1, y}
+        :north -> {x - 1, y}
+        :east -> {x, y + 1}
+        :south -> {x + 1, y}
+        :west -> {x, y - 1}
       end
 
     case Map.get(positions, new_position, :not_found) do
       @obstacle_cell ->
-        new_directon = next_direction(current_direction)
-        {current_position, new_directon, visited}
+        new_direction = next_direction(current_direction)
+        IO.puts("Direction changed to #{new_direction} at position #{inspect(current_position)}")
 
+        {current_position, new_direction, visited}
+
+      :not_found ->
+        new_direction = next_direction(current_direction)
+
+        IO.puts(
+          "Out of bounds! Changing direction to #{new_direction} at position #{inspect(current_position)}"
+        )
+          {current_position,new_direction,visited}
       _ ->
         updated_visited = MapSet.put(visited, new_position)
+
         {new_position, current_direction, updated_visited}
     end
   end
@@ -63,7 +73,7 @@ positions =
   |> Enum.map(fn {row, row_idx} ->
     Enum.with_index(row)
     |> Enum.map(fn {col, col_idx} ->
-      {{row_idx, col_idx}, col}
+      {{row_idx + 1, col_idx + 2}, col}
     end)
   end)
   |> List.flatten()
@@ -81,4 +91,5 @@ start_position =
     nil -> :not_found
   end
 
+IO.puts(inspect(start_position))
 Board.solve(start_position, :north, positions)
