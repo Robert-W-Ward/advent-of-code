@@ -1,95 +1,114 @@
 defmodule Board do
   @empty_cell "."
   @obstacle_cell "#"
+  @start_cell "^"
   @type direction :: :north | :east | :south | :west
   @type position :: {integer(), integer()}
   @type visited :: MapSet.t()
-  defstruct state: [], direction: :north, visited: MapSet.new()
 
-  def solve(start_position, direction, positions) do
-    visited = MapSet.new([start_position])
-    iterate(start_position, direction, visited, positions)
+  def position_map(input) do
+    input
+    |> Enum.with_index()
+    |> Enum.map(fn {row, row_idx} ->
+      Enum.with_index(row)
+      |> Enum.map(fn {col, col_idx} ->
+        {{col_idx, row_idx}, col}
+      end)
+    end)
+    |> List.flatten()
+    |> Enum.into(%{})
   end
 
-  defp iterate(current_position, current_direction, visited, positions) do
-    {new_position, new_direction, updated_visited} =
-      step(current_position, current_direction, visited, positions)
-
-    if new_position == {90, 53} and MapSet.size(updated_visited) > 1 do
-      IO.puts("Finished! Total spaces visited: #{MapSet.size(updated_visited)}")
-    else
-      iterate(new_position, new_direction, updated_visited, positions)
-    end
+  def solve(start_position, start_direction, positions) do
+    {x, y} = start_position
+    visited = MapSet.new()
+    iterate(x, y, start_direction, visited, positions)
   end
 
-  @spec step(position(), direction(), MapSet.t(), map()) :: {position(), direction(), MapSet.t()}
-  def step(current_position, current_direction, visited, positions) do
-    {x, y} = current_position
-
-    new_position =
-      case current_direction do
-        :north -> {x - 1, y}
-        :east -> {x, y + 1}
-        :south -> {x + 1, y}
-        :west -> {x, y - 1}
+  def iterate(x, y, direction, visited, positions) do
+    # Get next position based on current position and direction of travel
+    next_position =
+      case direction do
+        :north -> {x, y - 1}
+        :east -> {x + 1, y}
+        :south -> {x, y + 1}
+        :west -> {x - 1, y}
       end
 
-    case Map.get(positions, new_position, :not_found) do
-      @obstacle_cell ->
-        new_direction = next_direction(current_direction)
-        IO.puts("Direction changed to #{new_direction} at position #{inspect(current_position)}")
+    {next_x, next_y} = next_position
 
-        {current_position, new_direction, visited}
+    # Mark current location x,y as visited along with the direction we were headed
+    new_visited = MapSet.put(visited, {{x, y}, direction})
 
-      :not_found ->
-        new_direction = next_direction(current_direction)
+    cond do
+      MapSet.member?(visited, {{x, y}, direction}) ->
+        "loop"
 
-        IO.puts(
-          "Out of bounds! Changing direction to #{new_direction} at position #{inspect(current_position)}"
-        )
-          {current_position,new_direction,visited}
-      _ ->
-        updated_visited = MapSet.put(visited, new_position)
+      next_y < 0 or next_y >= :math.sqrt(Kernel.map_size(positions)) ->
+        new_visited
 
-        {new_position, current_direction, updated_visited}
+      next_x < 0 or next_x >= :math.sqrt(Kernel.map_size(positions)) ->
+        new_visited
+
+      true ->
+        # Check if new position is a empty cell, obstacle or something else
+        case Map.get(positions, next_position, :not_found) do
+          # Move forward
+          @empty_cell ->
+            iterate(next_x, next_y, direction, new_visited, positions)
+
+          @start_cell ->
+            iterate(next_x, next_y, direction, new_visited, positions)
+
+          @obstacle_cell ->
+            # Encountered an obstacle: change direction and continue recursion
+            new_direction = next_direction(direction)
+            iterate(x, y, new_direction, new_visited, positions)
+
+          _ ->
+            # Reached map bounds
+            new_visited
+        end
     end
   end
 
-  # Get the next direction clockwise
   defp next_direction(:north), do: :east
   defp next_direction(:east), do: :south
   defp next_direction(:south), do: :west
   defp next_direction(:west), do: :north
-end
 
-{:ok, contents} = File.read("map.txt")
-matrix = String.split(contents, "\n") |> Enum.map(fn row -> String.graphemes(row) end)
-
-positions =
-  matrix
-  # Rows of the matrix -> tuples wit {list , row_idx}
-  |> Enum.with_index()
-  # maps of these new tuples
-  |> Enum.map(fn {row, row_idx} ->
-    Enum.with_index(row)
-    |> Enum.map(fn {col, col_idx} ->
-      {{row_idx + 1, col_idx + 2}, col}
-    end)
-  end)
-  |> List.flatten()
-  |> Enum.sort(fn {{row1, col1}, _}, {{row2, col2}, _} ->
-    {row1, col1} <= {row2, col2}
-  end)
-  # |> IO.inspect(limit: :infinity)
-  |> Enum.into(%{})
-
-start_position =
-  positions
-  |> Enum.find(fn {_key, value} -> value == "^" end)
-  |> case do
-    {key, _value} -> key
-    nil -> :not_found
+  def swap_char(grid, x, y) do
+    List.update_at(
+      grid,
+      y,
+      &List.update_at(&1, x, fn char ->
+        case char do
+          "." -> "#"
+          _ -> "^"
+        end
+      end)
+    )
   end
 
-IO.puts(inspect(start_position))
-Board.solve(start_position, :north, positions)
+  def part2(visited, grid) do
+    visited
+    |> MapSet.new(fn {{x, y}, _direction} -> {x, y} end)
+    |> Enum.map(fn {x, y} ->
+      # Maps over every position of the guards *acutal* patrol
+      # Swaps each position with a new *obstacle"
+      # solves this *new* board
+      solve(swap_char(grid, x, y))
+    end)
+      # Counts the number of these *new* boards return *loop*
+    |> Enum.count(&(&1 == "loop"))
+  end
+end
+
+# Reading and parsing the map file
+{:ok, contents} = File.read("map.txt")
+matrix = contents |> String.split("\n", trim: true) |> Enum.map(&String.graphemes/1)
+
+visited = Board.solve({51, 89}, :north, Board.position_map(matrix))
+visited_no_dir = visited |> MapSet.new(fn {{x, y}, _direction} -> {x, y} end)
+IO.puts("Part1 Answer #{MapSet.size(visited_no_dir)}")
+IO.puts("Part2 Answer #{Board.part2(visited_no_dir,matrix)}")
