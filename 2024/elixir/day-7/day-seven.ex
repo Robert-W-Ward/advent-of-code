@@ -1,5 +1,5 @@
 {:ok, contents} = File.read("calibrations.txt")
-lines = contents |> String.split("\r\n", trim: true)
+lines = contents |> String.split("\n", trim: true)
 
 defmodule Calibrator do
   def calibrate(cur, remaining, goal) do
@@ -15,7 +15,7 @@ defmodule Calibrator do
         concat =
           String.to_integer(Integer.to_string(cur) <> Integer.to_string(next))
 
-        calibrate(sum, rest, goal) or calibrate(prod, rest, goal) or calibrate(concat, rest, goal)
+        calibrate(sum, rest, goal) or calibrate(prod, rest, goal)
     end
   end
 end
@@ -40,6 +40,3 @@ Enum.map(c, fn line ->
 end)
 |> Enum.sum()
 |> IO.inspect()
-
-# If operation would go over goal switch to other operation and retry iteration with this one, if it still goes over list can't be fixed
-# Else continue to next pair with previous operation
