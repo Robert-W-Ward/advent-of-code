@@ -6,18 +6,9 @@ import Control.Concurrent.STM (check)
 import Data.Array (Ix (range))
 import Data.Bool (bool)
 import Data.Char (digitToInt, isDigit)
+import Data.List (sortBy, subsequences)
 import System.Environment (getArgs)
 
-{- Two pointers?
-- It seems like the best approach is to have tow "pointers" one pointing at the left most element in the list,
-one pointing at leftmost + 1 and interate this pointer along until you get to the end of thelist taking the value pointed at
-by both pointers as you move along and checking if its greater than the "max" size you have seen if it is replace max otherwise
-continue the right pointer (until it reaches then end)
-
-- fold over each element of each list doing the two pointers thing returning the largest value present in the list
-- sum over the result of the folds
-
--}
 
 bestPair :: String -> Int
 bestPair xs =
@@ -27,7 +18,7 @@ bestPair xs =
       step d (bestRight, bestPairSoFar) =
         let bestPair' =
               if bestRight == 0
-                then bestPairSoFar 
+                then bestPairSoFar
                 else max bestPairSoFar (10 * d + bestRight)
             bestRight' = max bestRight d
          in (bestRight', bestPair')
@@ -35,6 +26,32 @@ bestPair xs =
       -- initial state: no right digit yet → bestRight = 0, bestPair = 0
       (_, finalBestPair) = foldr step (0, 0) digits
    in finalBestPair
+
+duoDecimals :: String -> [String]
+duoDecimals x = filter (\sub -> length sub == 12) (subsequences x)
+
+bestSubsequence :: String -> Int
+bestSubsequence xs =
+  let k = 12
+      bestDigits = pickK k xs
+   in read bestDigits
+
+-- pickK k xs = lexicographically largest subsequence of xs of length k
+pickK :: Int -> String -> String
+pickK k xs =
+  let n = length xs
+      toDrop0 = n - k
+   in take k (reverse (go toDrop0 [] xs))
+  where
+    go :: Int -> [Char] -> [Char] -> [Char]
+    go _ acc [] = acc
+    go d acc (c : cs)
+      | d > 0,
+        (a : as) <- acc,
+        a < c =
+          go (d - 1) as (c : cs) 
+      | otherwise =
+          go d (c : acc) cs 
 
 parseInput :: String -> [String]
 parseInput = lines
@@ -44,7 +61,8 @@ solvePart1 :: [String] -> Int
 solvePart1 xs = sum (map bestPair xs)
 
 -- Part 2
-solvePart2 xs = sum (map bestPair xs)
+solvePart2 :: [String] -> Int
+solvePart2 xs = sum (map bestSubsequence xs)
 
 main :: IO ()
 main = do
@@ -52,6 +70,6 @@ main = do
     [filePath] ->
       readFile filePath >>= \contents ->
         let result = parseInput contents
-            answer = solvePart1 result
+            answer = solvePart2 result
          in print answer
     _ -> putStrLn "Usage: program filepath"
